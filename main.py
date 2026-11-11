@@ -3,7 +3,9 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from database import init_db
 from routers import auth, customers, dashboard, pages
@@ -24,6 +26,14 @@ app.include_router(dashboard.router)
 app.include_router(pages.router)
 
 
+def is_browser_request(request: Request) -> bool:
+    """Identify browser navigations and fetches, including JSON-accepting fetch()."""
+    accept = request.headers.get("accept", "").lower()
+    fetch_mode = request.headers.get("sec-fetch-mode", "").lower()
+    fetch_dest = request.headers.get("sec-fetch-dest", "").lower()
+    return bool(fetch_mode or fetch_dest or "text/html" in accept)
+
+
 @app.middleware("http")
 async def refresh_session_cookie(request: Request, call_next):
     response = await call_next(request)
@@ -35,8 +45,7 @@ async def refresh_session_cookie(request: Request, call_next):
 
 @app.exception_handler(SessionExpiredError)
 async def session_expired_handler(request: Request, _exc: SessionExpiredError):
-    accept = request.headers.get("accept", "").lower()
-    if "application/json" in accept:
+    if not is_browser_request(request):
         response = JSONResponse(
             status_code=401,
             content={"detail": "세션이 만료되었습니다."},
@@ -45,6 +54,15 @@ async def session_expired_handler(request: Request, _exc: SessionExpiredError):
         response = RedirectResponse(url="/login?session_expired=true", status_code=303)
     clear_auth_cookie(response)
     return response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def unauthorized_request_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 401 and is_browser_request(request):
+        response = RedirectResponse(url="/login?login_required=true", status_code=303)
+        clear_auth_cookie(response)
+        return response
+    return await http_exception_handler(request, exc)
 
 
 @app.get("/")

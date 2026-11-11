@@ -31,6 +31,7 @@ def login_page(
     db: Session = Depends(get_db),
     registered: bool = False,
     session_expired: bool = False,
+    login_required: bool = False,
 ):
     if get_optional_current_employee(request, db):
         return RedirectResponse(url="/customers", status_code=303)
@@ -41,6 +42,7 @@ def login_page(
             "user": None,
             "registered": registered,
             "session_expired": session_expired,
+            "login_required": login_required,
             "error": None,
         },
     )
@@ -61,7 +63,13 @@ def login_form(
         return templates.TemplateResponse(
             request=request,
             name="login.html",
-            context={"user": None, "registered": False, "session_expired": False, "error": exc.detail},
+            context={
+                "user": None,
+                "registered": False,
+                "session_expired": False,
+                "login_required": False,
+                "error": exc.detail,
+            },
             status_code=401,
         )
     response = RedirectResponse(url="/customers", status_code=303)
