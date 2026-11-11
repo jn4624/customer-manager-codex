@@ -2,6 +2,7 @@
 
 ## 프로젝트 개요
 - FastAPI 진입점은 `main.py`이며 라우터는 `routers/auth.py`, `routers/customers.py`, `routers/dashboard.py`에 둔다.
+- HTML 페이지 라우터는 `routers/pages.py`, 템플릿은 `templates/`에 둔다.
 - 기존 SQLAlchemy 모델과 DB 연결을 재사용한다.
 - `customer.db`는 로컬 고객/주문 데이터 원본이다. 경로를 임의로 바꾸거나 파일을 교체하지 않는다.
 
@@ -16,7 +17,8 @@
 python3 -m pip install -r requirements.txt
 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
-서버 시작 시 `Base.metadata.create_all()`은 없는 테이블만 생성한다. 기본 주소는 `http://127.0.0.1:8000`, API 문서는 `/docs`다.
+서버 시작 시 `Base.metadata.create_all()`은 없는 테이블만 생성하며, `employees.password_hash` 컬럼이 없으면 nullable 컬럼만 추가한다. 기본 주소는 `http://127.0.0.1:8000`, API 문서는 `/docs`다.
+인증 서명 키는 환경 변수 `JWT_SECRET_KEY`로 설정한다. `APP_ENV=production`에서는 서명 키가 32바이트 이상이어야 하고 `COOKIE_SECURE=true`여야 서버가 시작된다. 로컬 개발에서는 임시 키를 생성하므로 서버를 다시 시작하면 기존 토큰이 무효화된다. HTTPS 배포 시 `APP_ENV=production`, `JWT_SECRET_KEY`, `COOKIE_SECURE=true`를 설정한다.
 
 ## 테스트 및 확인
 ```bash
@@ -32,6 +34,8 @@ curl -i http://127.0.0.1:8000/health
 - `models.py`, `database.py`, `customer.db`를 먼저 확인하고 기존 코드를 우선 확장한다.
 - 기존 테이블의 칼럼 삭제, 칼럼 타입 변경, 기존 데이터 삭제/초기화/덮어쓰기를 금지한다.
 - 스키마 확장은 nullable 칼럼 또는 새 테이블만 허용한다. DB 변경 전 기존 데이터와 참조 관계를 보존한다.
+- 인증 계정은 기존 `employees` 테이블을 사용하고 `password_hash` nullable 칼럼만 추가한다. 계정 정보를 별도 사용자 테이블에 중복 저장하지 않는다.
+- 비밀번호 원문을 저장하거나 로그에 남기지 않는다. 인증 토큰은 만료가 설정된 JWT httpOnly 쿠키로 전달하며 서버 세션을 만들지 않는다.
 - `Base.metadata.create_all()`을 사용해 기존 DB에 없는 테이블만 추가한다. 개발 편의를 이유로 DB 파일을 재생성하지 않는다.
 - 의존성은 `requirements.txt`에서 관리한다. 로컬 파이썬 환경에 설치하며 가상환경을 만들지 않는다.
 - 고객을 삭제할 때 연관 주문의 외래 키 제약을 우회하거나 주문 데이터를 함께 삭제하지 않는다.

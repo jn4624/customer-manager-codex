@@ -42,6 +42,7 @@ class Employee(Base):
     email: Mapped[str | None] = mapped_column(String, unique=True, comment="직원 이메일(고유값)")
     department: Mapped[str | None] = mapped_column(String, comment="소속 부서")
     hire_date: Mapped[str | None] = mapped_column(String, comment="입사일(ISO 8601 날짜)")
+    password_hash: Mapped[str | None] = mapped_column(String, nullable=True, comment="bcrypt 비밀번호 해시")
 
     orders: Mapped[list["Order"]] = relationship(back_populates="employee")
 
