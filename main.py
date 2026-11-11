@@ -2,10 +2,12 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from database import init_db
-from routers import auth, customers, dashboard
+from routers import auth, customers, dashboard, pages
+from routers.auth import SessionExpiredError, clear_auth_cookie, set_auth_cookie
 
 
 @asynccontextmanager
@@ -19,6 +21,30 @@ app = FastAPI(title="Customer Manager API", version="0.1.0", lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(customers.router)
 app.include_router(dashboard.router)
+app.include_router(pages.router)
+
+
+@app.middleware("http")
+async def refresh_session_cookie(request: Request, call_next):
+    response = await call_next(request)
+    employee = getattr(request.state, "refresh_employee", None)
+    if employee is not None:
+        set_auth_cookie(response, employee)
+    return response
+
+
+@app.exception_handler(SessionExpiredError)
+async def session_expired_handler(request: Request, _exc: SessionExpiredError):
+    accept = request.headers.get("accept", "").lower()
+    if "application/json" in accept:
+        response = JSONResponse(
+            status_code=401,
+            content={"detail": "세션이 만료되었습니다."},
+        )
+    else:
+        response = RedirectResponse(url="/login?session_expired=true", status_code=303)
+    clear_auth_cookie(response)
+    return response
 
 
 @app.get("/")

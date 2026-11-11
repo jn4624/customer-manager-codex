@@ -10,21 +10,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from database import SessionLocal
-from models import Customer
+from database import get_db
+from models import Customer, Employee
+from routers.auth import get_current_employee
 
 router = APIRouter(prefix="/api/customers", tags=["고객"])
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 DatabaseSession = Annotated[Session, Depends(get_db)]
+CurrentEmployee = Annotated[Employee, Depends(get_current_employee)]
 
 
 class CustomerCreate(BaseModel):
@@ -56,7 +50,7 @@ class CustomerRead(BaseModel):
 
 
 @router.post("", response_model=CustomerRead, status_code=201)
-def create_customer(payload: CustomerCreate, db: DatabaseSession):
+def create_customer(payload: CustomerCreate, db: DatabaseSession, _employee: CurrentEmployee):
     customer = Customer(
         **payload.model_dump(),
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -74,6 +68,7 @@ def create_customer(payload: CustomerCreate, db: DatabaseSession):
 @router.get("", response_model=list[CustomerRead])
 def list_customers(
     db: DatabaseSession,
+    _employee: CurrentEmployee,
     q: str | None = None,
     tier: str | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
@@ -99,7 +94,7 @@ def list_customers(
 
 
 @router.get("/export.csv")
-def export_customers(db: DatabaseSession):
+def export_customers(db: DatabaseSession, _employee: CurrentEmployee):
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow(["customer_id", "name", "email", "phone", "address", "created_at", "tier"])
@@ -123,7 +118,7 @@ def export_customers(db: DatabaseSession):
 
 
 @router.get("/{customer_id}", response_model=CustomerRead)
-def get_customer(customer_id: int, db: DatabaseSession):
+def get_customer(customer_id: int, db: DatabaseSession, _employee: CurrentEmployee):
     customer = db.get(Customer, customer_id)
     if customer is None:
         raise HTTPException(status_code=404, detail="고객을 찾을 수 없습니다.")
@@ -131,7 +126,12 @@ def get_customer(customer_id: int, db: DatabaseSession):
 
 
 @router.patch("/{customer_id}", response_model=CustomerRead)
-def update_customer(customer_id: int, payload: CustomerUpdate, db: DatabaseSession):
+def update_customer(
+    customer_id: int,
+    payload: CustomerUpdate,
+    db: DatabaseSession,
+    _employee: CurrentEmployee,
+):
     customer = db.get(Customer, customer_id)
     if customer is None:
         raise HTTPException(status_code=404, detail="고객을 찾을 수 없습니다.")
@@ -143,7 +143,7 @@ def update_customer(customer_id: int, payload: CustomerUpdate, db: DatabaseSessi
 
 
 @router.delete("/{customer_id}", status_code=204)
-def delete_customer(customer_id: int, db: DatabaseSession):
+def delete_customer(customer_id: int, db: DatabaseSession, _employee: CurrentEmployee):
     customer = db.get(Customer, customer_id)
     if customer is None:
         raise HTTPException(status_code=404, detail="고객을 찾을 수 없습니다.")

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}고객 목록 · Customer Manager{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>고객</h1>
+  <p class="muted">등록된 고객 정보를 확인합니다.</p>
+  {% if customers %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>이름</th><th>이메일</th><th>전화번호</th><th>등급</th></tr></thead>
+      <tbody>
+        {% for customer in customers %}
+        <tr><td>{{ customer.name }}</td><td>{{ customer.email or "—" }}</td><td>{{ customer.phone or "—" }}</td><td>{{ customer.tier }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="message">표시할 고객이 없습니다.</div>
+  {% endif %}
+</section>
+{% endblock %}

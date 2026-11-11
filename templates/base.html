@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Customer Manager{% endblock %}</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #182230; background: #f5f7fb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header { height: 68px; display: flex; justify-content: space-between; align-items: center; padding: 0 5vw; background: #fff; border-bottom: 1px solid #e4e8ef; }
+    .brand { color: #182230; text-decoration: none; font-weight: 750; letter-spacing: -.02em; }
+    .account { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+    .account form { margin: 0; }
+    main { width: min(1040px, 92vw); margin: 48px auto; }
+    .panel { background: #fff; border: 1px solid #e4e8ef; border-radius: 14px; padding: 28px; box-shadow: 0 8px 24px #24324a0a; }
+    .auth-panel { width: min(440px, 100%); margin: 6vh auto; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    .muted { color: #667085; }
+    label { display: block; margin: 18px 0 6px; font-size: 14px; font-weight: 600; }
+    input { width: 100%; border: 1px solid #cfd6e1; border-radius: 8px; padding: 11px 12px; font: inherit; }
+    button, .button { border: 0; border-radius: 8px; background: #315bea; color: white; padding: 11px 16px; font: inherit; font-weight: 650; cursor: pointer; text-decoration: none; }
+    button.secondary { color: #344054; border: 1px solid #d0d5dd; background: #fff; padding: 8px 12px; }
+    .submit { width: 100%; margin-top: 22px; }
+    .message { margin: 16px 0; padding: 12px 14px; border-radius: 8px; background: #eef4ff; color: #2446a8; }
+    .error { background: #fff0f0; color: #a12727; }
+    .auth-link { margin-top: 20px; text-align: center; color: #667085; font-size: 14px; }
+    .auth-link a { color: #315bea; }
+    .table-wrap { overflow-x: auto; margin-top: 24px; }
+    table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #edf0f4; font-size: 14px; }
+    th { color: #667085; font-weight: 600; background: #fafbfc; }
+    @media (max-width: 600px) { header { padding: 0 4vw; } main { margin: 28px auto; } .panel { padding: 22px; } .account { gap: 8px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="brand" href="{% if user %}/customers{% else %}/login{% endif %}">Customer Manager</a>
+    <div class="account">
+      {% if user %}
+        <span>{{ user.name }}님 안녕하세요</span>
+        <form action="/logout" method="post"><button class="secondary" type="submit">로그아웃</button></form>
+      {% endif %}
+    </div>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>
