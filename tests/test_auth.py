@@ -106,6 +106,31 @@ def test_customer_and_dashboard_apis_require_authentication(app_client):
     assert client.get("/api/customers").status_code == 401
     assert client.get("/api/customers/export.csv").status_code == 401
     assert client.get("/api/dashboard/sales").status_code == 401
+    api_response = client.get(
+        "/api/customers",
+        headers={"accept": "application/json"},
+    )
+    assert api_response.status_code == 401
+    assert api_response.json() == {"detail": "로그인이 필요합니다."}
+
+
+def test_unauthenticated_browser_api_requests_redirect_to_login(app_client):
+    client, _ = app_client
+    browser_headers = [
+        {"accept": "text/html", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document"},
+        {"accept": "application/json", "sec-fetch-mode": "same-origin", "sec-fetch-dest": "empty"},
+    ]
+
+    for headers in browser_headers:
+        response = client.get(
+            "/api/customers",
+            headers=headers,
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == "/login?login_required=true"
+        login_page = client.get(response.headers["location"])
+        assert "로그인 후 이용할 수 있습니다" in login_page.text
 
 
 def _make_token(employee_id: int, name: str, issued_at, expires_at) -> str:
@@ -152,6 +177,15 @@ def test_expired_token_redirects_browsers_and_returns_json_401_for_api(app_clien
     login_page = client.get(browser_response.headers["location"])
     assert login_page.status_code == 200
     assert "세션이 만료되었습니다" in login_page.text
+
+    client.cookies.set(COOKIE_NAME, expired_token)
+    browser_api_response = client.get(
+        "/api/customers",
+        headers={"accept": "application/json", "sec-fetch-mode": "same-origin"},
+        follow_redirects=False,
+    )
+    assert browser_api_response.status_code == 303
+    assert browser_api_response.headers["location"] == "/login?session_expired=true"
 
     client.cookies.set(COOKIE_NAME, expired_token)
     api_response = client.get(
