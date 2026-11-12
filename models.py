@@ -20,6 +20,22 @@ class Customer(Base):
     tier: Mapped[str] = mapped_column(String, nullable=False, default="일반", comment="고객 등급(VIP/일반/신규)")
 
     orders: Mapped[list["Order"]] = relationship(back_populates="customer")
+    hidden_record: Mapped["HiddenCustomer | None"] = relationship(
+        back_populates="customer", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class HiddenCustomer(Base):
+    """Customer IDs hidden from ordinary customer lookups."""
+
+    __tablename__ = "hidden_customers"
+
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey("customers.customer_id", ondelete="CASCADE"),
+        primary_key=True,
+        comment="숨김 처리한 고객 ID",
+    )
+    customer: Mapped[Customer] = relationship(back_populates="hidden_record")
 
 
 class Product(Base):
