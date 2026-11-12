@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}홈 · Customer Manager{% endblock %}
+{% block content %}
+<section class="panel">
+  {% if user %}
+  <h1>{{ user.name }}님 안녕하세요</h1>
+  <p class="muted">고객 정보를 확인하고 관리할 수 있습니다.</p>
+  <a class="button" href="/customers">고객 목록 바로가기</a>
+  {% else %}
+  <h1>Customer Manager</h1>
+  <p class="muted">로그인하고 고객 관리 서비스를 이용하세요.</p>
+  <a class="button" href="/login">로그인하기</a>
+  <p class="auth-link">계정이 없으신가요? <a href="/signup">회원가입</a></p>
+  {% endif %}
+</section>
+{% endblock %}
