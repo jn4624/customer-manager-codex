@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} · 고객 상세{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="section-heading">
+    <div>
+      <h1>고객 상세</h1>
+      <p class="muted"><strong id="customer-name-display">{{ customer.name }}</strong> · 이메일, 등록일, 등급은 수정할 수 없습니다.</p>
+    </div>
+    <a class="button secondary" href="/customers">목록으로</a>
+  </div>
+  {% if error %}<div class="message error" role="alert">{{ error }}</div>{% endif %}
+  <div id="customer-edit-error" class="message error" role="alert" hidden></div>
+  <div id="customer-edit-success" class="message" role="status" aria-live="polite" hidden></div>
+  <form id="customer-edit-form" action="/customers/{{ customer.customer_id }}/edit" method="post">
+    <div class="form-grid">
+      <div>
+        <label for="name">이름</label>
+        <input id="name" name="name" value="{{ customer.name }}" required maxlength="200" disabled>
+      </div>
+      <div>
+        <label for="phone">전화번호</label>
+        <input id="phone" name="phone" value="{{ customer.phone or '' }}" disabled>
+      </div>
+      <div>
+        <label for="email">이메일</label>
+        <input id="email" value="{{ customer.email or '—' }}" disabled>
+      </div>
+      <div>
+        <label for="created_at">등록일</label>
+        <input id="created_at" value="{{ customer.created_at }}" disabled>
+      </div>
+      <div>
+        <label for="tier">등급</label>
+        <input id="tier" value="{{ customer.tier }}" disabled>
+      </div>
+      <div>
+        <label for="address">주소</label>
+        <input id="address" name="address" value="{{ customer.address or '' }}" disabled>
+      </div>
+    </div>
+  </form>
+  <div class="detail-actions customer-detail-actions">
+    <button id="edit-button" type="button">수정</button>
+    <button id="save-button" type="submit" form="customer-edit-form" hidden disabled>수정 저장</button>
+    <button id="cancel-button" class="secondary" type="button" hidden>취소</button>
+  </div>
+  <section aria-labelledby="order-history-title">
+    <h2 id="order-history-title">주문 이력</h2>
+    {% if order_history %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>주문 번호</th><th>주문일</th><th>상품</th><th>수량</th><th>주문 금액</th><th>상태</th></tr>
+        </thead>
+        <tbody>
+          {% for order in order_history %}
+          <tr>
+            <td>{{ order.order_id }}</td>
+            <td>{{ order.order_date }}</td>
+            <td>{{ order.product.name }}</td>
+            <td>{{ order.quantity }}</td>
+            <td>{{ "{:,.0f}".format(order.total_amount) }}원</td>
+            <td>{{ order.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="message">등록된 주문 이력이 없습니다.</p>
+    {% endif %}
+  </section>
+</section>
+<script>
+  const customerForm = document.getElementById("customer-edit-form");
+  const editableFields = ["name", "phone", "address"].map((id) => document.getElementById(id));
+  const editButton = document.getElementById("edit-button");
+  const cancelButton = document.getElementById("cancel-button");
+  const saveButton = document.getElementById("save-button");
+  const editError = document.getElementById("customer-edit-error");
+  const editSuccess = document.getElementById("customer-edit-success");
+
+  function setEditing(editing) {
+    editableFields.forEach((field) => { field.disabled = !editing; });
+    editButton.hidden = editing;
+    cancelButton.hidden = !editing;
+    saveButton.hidden = !editing;
+    saveButton.disabled = !editing;
+  }
+
+  editButton.addEventListener("click", () => {
+    editError.hidden = true;
+    editSuccess.hidden = true;
+    setEditing(true);
+    document.getElementById("name").focus();
+  });
+
+  cancelButton.addEventListener("click", () => {
+    customerForm.reset();
+    editError.hidden = true;
+    setEditing(false);
+  });
+
+  customerForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    saveButton.disabled = true;
+    editError.hidden = true;
+    try {
+      const values = Object.fromEntries(new FormData(customerForm));
+      const response = await fetch("/api/customers/{{ customer.customer_id }}", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          phone: values.phone || null,
+          address: values.address || null,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "고객 정보를 저장하지 못했습니다.");
+
+      editableFields.forEach((field) => {
+        field.value = payload[field.name] || "";
+        field.defaultValue = field.value;
+      });
+      document.getElementById("customer-name-display").textContent = payload.name;
+      document.title = `${payload.name} · 고객 상세`;
+      editSuccess.textContent = "수정 내용이 저장되었습니다.";
+      editSuccess.hidden = false;
+      setEditing(false);
+    } catch (error) {
+      editError.textContent = error.message;
+      editError.hidden = false;
+      saveButton.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

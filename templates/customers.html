@@ -2,21 +2,213 @@
 {% block title %}고객 목록 · Customer Manager{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>고객</h1>
-  <p class="muted">등록된 고객 정보를 확인합니다.</p>
+  <div class="section-heading">
+    <div>
+      <h1>고객</h1>
+      <p class="muted customer-total">{% if has_conditions %}검색 결과{% else %}전체 고객{% endif %} <strong>{{ "{:,}".format(customer_count) }}</strong>명</p>
+    </div>
+    <div class="customer-list-actions">
+      <form id="bulk-hide-form" action="/customers/hide-selected" method="post"></form>
+      <button id="open-customer-create" type="button">고객 등록</button>
+      <button id="delete-selected-button" class="danger" type="submit" form="bulk-hide-form" disabled>선택 삭제</button>
+    </div>
+  </div>
+  <form class="customer-search" action="/customers" method="get" role="search">
+    <div class="search-field">
+      <label for="customer-search-query">이름·이메일</label>
+      <input id="customer-search-query" name="q" type="search" value="{{ search_q }}" placeholder="이름 또는 이메일 검색" maxlength="200">
+    </div>
+    <div class="search-field">
+      <label for="customer-tier-filter">등급</label>
+      <select id="customer-tier-filter" name="tier">
+        <option value="">전체 등급</option>
+        {% for tier_option in tier_options %}<option value="{{ tier_option }}"{% if tier_option == selected_tier %} selected{% endif %}>{{ tier_option }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="search-field">
+      <label for="customer-region-filter">지역</label>
+      <select id="customer-region-filter" name="region">
+        <option value="">전체 지역</option>
+        {% for region_option in region_options %}<option value="{{ region_option }}"{% if region_option == selected_region %} selected{% endif %}>{{ region_option }}</option>{% endfor %}
+      </select>
+    </div>
+    <button type="submit">검색</button>
+    {% if has_conditions %}<a class="button secondary" href="/customers">초기화</a>{% endif %}
+  </form>
   {% if customers %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>이름</th><th>이메일</th><th>전화번호</th><th>등급</th></tr></thead>
+      <thead>
+        <tr>
+          <th class="selection-cell"><input id="select-all-customers" type="checkbox" aria-label="현재 페이지 고객 모두 선택"></th>
+          <th>이름</th><th>이메일</th><th>전화번호</th><th>등급</th>
+        </tr>
+      </thead>
       <tbody>
         {% for customer in customers %}
-        <tr><td>{{ customer.name }}</td><td>{{ customer.email or "—" }}</td><td>{{ customer.phone or "—" }}</td><td>{{ customer.tier }}</td></tr>
+        <tr class="clickable-row" data-href="/customers/{{ customer.customer_id }}" role="link" tabindex="0">
+          <td class="selection-cell"><input class="customer-checkbox" type="checkbox" name="customer_ids" value="{{ customer.customer_id }}" form="bulk-hide-form" aria-label="{{ customer.name }} 선택"></td>
+          <td>{{ customer.name }}</td>
+          <td>{{ customer.email or "—" }}</td><td>{{ customer.phone or "—" }}</td><td>{{ customer.tier }}</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-  <div class="message">표시할 고객이 없습니다.</div>
+  <div class="message">{% if has_conditions %}검색 결과가 없습니다.{% else %}표시할 고객이 없습니다.{% endif %}</div>
   {% endif %}
+  <nav class="pagination" aria-label="고객 목록 페이지">
+    {% if page > 1 %}<a class="page-step" href="/customers?page=1{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" aria-label="처음 페이지">|‹</a>{% endif %}
+    {% if previous_page_group and previous_page_group > 1 %}<a class="page-step" href="/customers?page={{ previous_page_group }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" aria-label="이전 10페이지">«</a>{% endif %}
+    {% if previous_page %}<a class="page-step" href="/customers?page={{ previous_page }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" rel="prev" aria-label="이전 페이지">‹</a>{% endif %}
+    {% for page_number in page_numbers %}
+    <a class="page-number{% if page_number == page %} active{% endif %}" href="/customers?page={{ page_number }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}"{% if page_number == page %} aria-current="page"{% endif %}>{{ page_number }}</a>
+    {% endfor %}
+    {% if next_page %}<a class="page-step" href="/customers?page={{ next_page }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" rel="next" aria-label="다음 페이지">›</a>{% endif %}
+    {% if next_page_group and next_page_group < page_count %}<a class="page-step" href="/customers?page={{ next_page_group }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" aria-label="다음 10페이지">»</a>{% endif %}
+    {% if page < page_count %}<a class="page-step" href="/customers?page={{ page_count }}{% if pagination_query %}&amp;{{ pagination_query }}{% endif %}" aria-label="마지막 페이지">›|</a>{% endif %}
+    <span class="pagination-summary">{{ page }} / {{ page_count }} 페이지</span>
+  </nav>
 </section>
+<dialog id="customer-create-dialog" aria-labelledby="customer-create-title">
+  <form id="customer-create-form">
+    <h2 id="customer-create-title">고객 등록</h2>
+    <p class="muted">고객 정보를 입력해 주세요.</p>
+    <div id="customer-create-error" class="message error" role="alert" hidden></div>
+    <div class="form-grid">
+      <div>
+        <label for="new-customer-name">이름</label>
+        <input id="new-customer-name" name="name" required maxlength="200">
+      </div>
+      <div>
+        <label for="new-customer-email">이메일</label>
+        <input id="new-customer-email" name="email" type="email">
+      </div>
+      <div>
+        <label for="new-customer-phone">전화번호</label>
+        <input id="new-customer-phone" name="phone">
+      </div>
+      <div>
+        <label for="new-customer-address">주소</label>
+        <input id="new-customer-address" name="address">
+      </div>
+    </div>
+    <div class="customer-create-actions">
+      <button id="submit-customer-create" type="submit">등록</button>
+      <button id="cancel-customer-create" class="secondary" type="button">취소</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="customer-delete-dialog" aria-labelledby="customer-delete-title">
+  <form id="customer-delete-confirm-form">
+    <h2 id="customer-delete-title">고객 선택 삭제</h2>
+    <p id="customer-delete-message" class="muted"></p>
+    <div class="customer-create-actions">
+      <button id="confirm-customer-delete" class="danger" type="submit">삭제</button>
+      <button id="cancel-customer-delete" class="secondary" type="button">취소</button>
+    </div>
+  </form>
+</dialog>
+<script>
+  const createDialog = document.getElementById("customer-create-dialog");
+  const createForm = document.getElementById("customer-create-form");
+  const createError = document.getElementById("customer-create-error");
+  const submitCreateButton = document.getElementById("submit-customer-create");
+
+  document.getElementById("open-customer-create").addEventListener("click", () => {
+    createError.hidden = true;
+    createDialog.showModal();
+    document.getElementById("new-customer-name").focus();
+  });
+  document.getElementById("cancel-customer-create").addEventListener("click", () => {
+    createForm.reset();
+    createError.hidden = true;
+    createDialog.close();
+  });
+  createForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    submitCreateButton.disabled = true;
+    createError.hidden = true;
+    const formValues = Object.fromEntries(new FormData(createForm));
+    try {
+      const response = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          name: formValues.name,
+          email: formValues.email || null,
+          phone: formValues.phone || null,
+          address: formValues.address || null,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "고객을 등록하지 못했습니다.");
+      const customerPage = response.headers.get("X-Customer-Page") || "1";
+      window.location.assign(`/customers?page=${customerPage}`);
+    } catch (error) {
+      createError.textContent = error.message;
+      createError.hidden = false;
+      submitCreateButton.disabled = false;
+    }
+  });
+
+  const selectAllCustomers = document.getElementById("select-all-customers");
+  const customerCheckboxes = [...document.querySelectorAll(".customer-checkbox")];
+  const deleteSelectedButton = document.getElementById("delete-selected-button");
+  const bulkHideForm = document.getElementById("bulk-hide-form");
+  const deleteDialog = document.getElementById("customer-delete-dialog");
+  const deleteConfirmForm = document.getElementById("customer-delete-confirm-form");
+  const deleteMessage = document.getElementById("customer-delete-message");
+  let confirmBulkDelete = false;
+
+  function updateSelectionControls() {
+    const selectedCount = customerCheckboxes.filter((checkbox) => checkbox.checked).length;
+    deleteSelectedButton.disabled = selectedCount === 0;
+    if (selectAllCustomers) {
+      selectAllCustomers.checked = selectedCount > 0 && selectedCount === customerCheckboxes.length;
+      selectAllCustomers.indeterminate = selectedCount > 0 && selectedCount < customerCheckboxes.length;
+    }
+  }
+
+  if (selectAllCustomers) {
+    selectAllCustomers.addEventListener("change", () => {
+      customerCheckboxes.forEach((checkbox) => { checkbox.checked = selectAllCustomers.checked; });
+      updateSelectionControls();
+    });
+  }
+  customerCheckboxes.forEach((checkbox) => checkbox.addEventListener("change", updateSelectionControls));
+  deleteSelectedButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    const selectedCount = customerCheckboxes.filter((checkbox) => checkbox.checked).length;
+    if (!selectedCount) return;
+    deleteMessage.textContent = `선택한 고객 ${selectedCount}명을 삭제할까요?`;
+    deleteDialog.showModal();
+  });
+  document.getElementById("cancel-customer-delete").addEventListener("click", () => deleteDialog.close());
+  deleteConfirmForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    confirmBulkDelete = true;
+    deleteDialog.close();
+    bulkHideForm.requestSubmit();
+  });
+  bulkHideForm.addEventListener("submit", (event) => {
+    if (!confirmBulkDelete) event.preventDefault();
+    confirmBulkDelete = false;
+  });
+
+  document.querySelectorAll(".clickable-row").forEach((row) => {
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("a, button, input, select, textarea")) return;
+      window.location.assign(row.dataset.href);
+    });
+    row.addEventListener("keydown", (event) => {
+      if (event.target.closest("a, button, input, select, textarea")) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        window.location.assign(row.dataset.href);
+      }
+    });
+  });
+</script>
 {% endblock %}
