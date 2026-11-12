@@ -65,11 +65,6 @@ async def unauthorized_request_handler(request: Request, exc: StarletteHTTPExcep
     return await http_exception_handler(request, exc)
 
 
-@app.get("/")
-def root():
-    return {"service": "Customer Manager", "status": "ok"}
-
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
